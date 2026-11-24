@@ -124,7 +124,6 @@ minibank/
 ├── comptes-service/     Service Comptes (Spring Boot) — E1
 ├── infra/               infrastructure locale (docker compose), secrets dans infra/.env
 ├── docs/                sélection du dossier du SI (voir ci-dessous)
-├── AGENTS.md, CLAUDE.md règles communes aux agents de code IA
 └── .github/             intégration continue, modèles d'issues et de pull requests
 ```
 
@@ -150,7 +149,7 @@ Les schémas (UML/C4 avec leurs sources PlantUML, cartographies, BPMN) sont dans
 - **Schéma versionné** par Flyway ; API versionnées `/api/v1`, erreurs au format Problem Details (RFC 9457).
 - **Git** : une branche par user story, Conventional Commits, fusion par pull request après CI verte.
 - **Agents de code IA** : j'utilise Claude Code et Codex comme binômes, encadrés par des règles écrites
-  ([AGENTS.md](AGENTS.md)) ; chaque commit est relu et validé par moi.
+  (conventions de code, règles de gestion, sécurité) ; chaque commit est relu et validé par moi.
 
 ## Auteur
 
