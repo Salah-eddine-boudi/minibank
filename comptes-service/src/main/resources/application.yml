@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: comptes-service
+  datasource:
+    url: jdbc:postgresql://localhost:5433/comptes
+    username: minibank
+    password: minibank
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: false
