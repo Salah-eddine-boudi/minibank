@@ -1,0 +1,23 @@
+---
+name: User story
+about: Nouveau besoin fonctionnel
+title: "US-xx — "
+labels: story
+---
+
+**En tant que** …
+**je veux** …
+**afin de** …
+
+### Critères d'acceptation
+
+```gherkin
+Scénario: …
+  Étant donné …
+  Quand …
+  Alors …
+```
+
+**Exigences liées :** EF-.. / RG-..
+**Priorité :** Must / Should / Could
+**Estimation :** … points

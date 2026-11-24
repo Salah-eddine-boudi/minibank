@@ -1,0 +1,61 @@
+# =============================================================================
+# MiniBank — Intégration continue (GitHub Actions)
+# À chaque push sur main et à chaque pull request : compilation + tests du service Comptes,
+# avec une vraie base PostgreSQL fournie par GitHub le temps du job.
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  comptes-service:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: comptes-service       # toutes les commandes s'exécutent dans ce dossier
+
+    services:
+      postgres:                                  # conteneur PostgreSQL éphémère pour les tests d'intégration
+        image: postgres:17
+        env:
+          POSTGRES_DB: comptes
+          POSTGRES_USER: minibank
+          POSTGRES_PASSWORD: minibank
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U minibank"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+
+    env:
+      # Les variables d'environnement REMPLACENT les valeurs de application.yml :
+      # ici la base est sur 5432 (et non 5433 comme sur ton poste).
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/comptes
+      SPRING_DATASOURCE_USERNAME: minibank
+      SPRING_DATASOURCE_PASSWORD: minibank
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v5
+
+      - name: Installer Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven                           # met en cache les dépendances Maven entre deux exécutions
+
+      - name: Rendre le Maven Wrapper exécutable
+        run: chmod +x mvnw
+
+      - name: Compiler et tester
+        run: ./mvnw -B verify                    # -B : mode non interactif ; verify = compile + tests + contrôles
+
+      # Phase 7, étape suivante : couverture JaCoCo et analyse SonarCloud
+      # - name: Analyse SonarCloud
+      #   run: ./mvnw -B sonar:sonar -Dsonar.projectKey=... -Dsonar.organization=...
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}   # secret stocké dans GitHub, jamais dans le code
