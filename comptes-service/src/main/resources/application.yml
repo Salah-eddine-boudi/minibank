@@ -1,12 +1,29 @@
+# Configuration du Service Comptes.
+# Les valeurs ${VARIABLE:défaut} sont lues dans l'environnement ; le défaut sert au poste de développement.
+# En recette ou en production, on fournit DB_URL, DB_USERNAME, DB_PASSWORD : aucun secret réel en dur.
 spring:
   application:
     name: comptes-service
   datasource:
-    url: jdbc:postgresql://localhost:5433/comptes
-    username: minibank
-    password: minibank
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/comptes}   # 5433 : port hôte du conteneur (infra/docker-compose.yml)
+    username: ${DB_USERNAME:minibank}
+    password: ${DB_PASSWORD:minibank}                           # valeur de dev uniquement, identique à infra/.env
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
-    open-in-view: false
+      ddl-auto: validate      # Hibernate VÉRIFIE que les entités correspondent au schéma, il ne le modifie jamais
+    open-in-view: false       # pas de session JPA ouverte pendant le rendu HTTP (évite les requêtes cachées)
+  flyway:
+    locations: classpath:db/migration   # scripts V1__…sql, V2__…sql, appliqués dans l'ordre au démarrage
+  mvc:
+    problemdetails:
+      enabled: true           # erreurs HTTP au format Problem Details (RFC 9457)
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info  # seuls les points sans donnée sensible sont exposés
+  endpoint:
+    health:
+      probes:
+        enabled: true         # /actuator/health/liveness et /readiness, utilisés par Kubernetes (E8)
