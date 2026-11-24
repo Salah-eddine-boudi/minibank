@@ -30,7 +30,12 @@ Thumbs.db
 *.pem
 *.key
 
-# Fichiers personnels des agents (Claude Code, Codex) et sauvegardes
+# Fichiers des agents de code IA (Claude Code, Codex) : outils de travail locaux, jamais publiés
+AGENTS.md
+CLAUDE.md
 CLAUDE.local.md
-.claude/settings.local.json
+.claude/
+.codex/
+
+# Sauvegardes
 *.bak
