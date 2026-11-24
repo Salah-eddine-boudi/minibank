@@ -1,0 +1,60 @@
+' ============================================================================
+' MiniBank — 06. Diagramme d'états-transitions : cycle de vie d'un VIREMENT
+' Étape de la méthode : CONCEPTION — pour les objets qui ont un STATUT.
+' Chaque flèche = une transition autorisée. Tout ce qui n'est pas dessiné est
+' interdit : on ne passe jamais de REJETE à EXECUTE.
+' ============================================================================
+@startuml 06_etats_virement
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+skinparam shadowing false
+skinparam StateStartColor #000000
+skinparam ActivityStartColor #000000
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+skinparam state {
+  BorderColor #1F5FAD
+}
+
+title MiniBank — États d'un virement
+
+[*] --> RECU : demande reçue\n[données valides]
+
+state RECU : entry / enregistrer + clé d'idempotence
+state EN_CONTROLE : do / appeler le service Fraude
+state VALIDE
+state EXECUTE #E3F1E3 : entry / publier « virement exécuté »
+state REJETE #F6E3E3 : entry / enregistrer le motif
+state ECHOUE #F6E3E3 : entry / compenser (re-créditer la source)
+
+RECU --> REJETE : [plafond dépassé]
+RECU --> EN_CONTROLE : [montant ≥ 1 000 €]
+RECU --> VALIDE : [montant < 1 000 €]
+EN_CONTROLE --> VALIDE : score reçu [score < 70]
+EN_CONTROLE --> REJETE : score reçu [score ≥ 70]
+VALIDE --> EXECUTE : débit et crédit OK
+VALIDE --> REJETE : [solde insuffisant]
+VALIDE --> ECHOUE : erreur technique\naprès le débit
+
+EXECUTE --> [*]
+REJETE --> [*]
+ECHOUE --> [*]
+
+legend right
+<b>Clé de lecture — états-transitions</b>
+|= Symbole |= Signification |
+| Point noir | <b>État initial</b> |
+| Double cercle (cible) | <b>État final</b> |
+| Rectangle arrondi | <b>État</b> : situation stable de l'objet |
+| Flèche | <b>Transition</b> : écrite « événement [garde] / action » |
+| [garde] | Condition qui doit être vraie pour passer |
+| entry / ... | Action faite en <b>entrant</b> dans l'état |
+| do / ... | Activité faite <b>pendant</b> l'état |
+| Vert / rouge | Fin réussie / fins en échec (convention du projet) |
+<b>Méthode</b> : partir du point noir et suivre chaque flèche ;
+pour chaque état, lister les sorties possibles.
+Chaque flèche = au moins un test unitaire.
+endlegend
+@enduml

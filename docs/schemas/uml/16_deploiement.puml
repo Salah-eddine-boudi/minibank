@@ -1,0 +1,59 @@
+' ============================================================================
+' MiniBank — 16. Diagramme de déploiement (poste de développement)
+' OÙ tourne chaque morceau : machines, conteneurs, ports, protocoles.
+' C'est exactement ta configuration actuelle (Windows + Rancher Desktop).
+' ============================================================================
+@startuml 16_deploiement
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+skinparam shadowing false
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+skinparam node {
+  BorderColor #1F5FAD
+}
+
+title MiniBank — Déploiement sur le poste de développement
+
+node "PC Windows 11" as PC {
+  node "Navigateur" as NAV {
+    artifact "Application Angular\n(ng serve, port 4200)" as SPAART
+  }
+  node "VS Code / terminal" as IDE {
+    artifact "comptes-service.jar\n(mvnw spring-boot:run, port 8080)" as JAR #DCE8F7
+  }
+  node "Rancher Desktop — moteur Docker" as DOCKER {
+    node "conteneur minibank-postgres-1" as PG {
+      database "PostgreSQL 17\nport interne 5432" as PGDB
+    }
+    node "conteneur kafka (phase 5)" as KF
+    node "conteneur keycloak (phase 3)" as KC
+    node "conteneur projet15_db\n(autre projet)" as OLD #EDEDED
+  }
+}
+
+NAV --> JAR : HTTP localhost:8080\nJSON
+JAR --> PGDB : JDBC localhost:5433\n(mappé vers 5432)
+JAR ..> KF : localhost:9092
+NAV ..> KC : localhost:8180
+
+note right of OLD
+  Occupe déjà le port 5432 de Windows :
+  c'est pourquoi MiniBank utilise 5433.
+end note
+
+legend right
+<b>Clé de lecture — déploiement</b>
+|= Symbole |= Signification |
+| Cube (node) | <b>Nœud</b> : machine, VM, moteur ou conteneur qui exécute quelque chose |
+| Cube dans un cube | Nœud hébergé dans un autre |
+| Feuille cornée (artifact) | <b>Artefact</b> : fichier déployé (.jar, build Angular) |
+| Cylindre | Base de données |
+| Trait plein / pointillé | Communication active / prévue dans une phase future |
+| Étiquette du lien | Protocole et port |
+<b>Méthode</b> : partir de l'utilisateur (navigateur) et suivre les ports
+jusqu'à la base. Un port mal mappé = « connexion refusée ».
+endlegend
+@enduml

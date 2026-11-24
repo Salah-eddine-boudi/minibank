@@ -1,0 +1,91 @@
+' ============================================================================
+' MiniBank — 04. Diagramme d'activité : processus de virement (avec couloirs)
+' Étape de la méthode : ANALYSE / CONCEPTION — le FLUX de travail : dans quel
+' ordre, quelles décisions, et QUI (quel couloir) fait chaque étape.
+' ============================================================================
+@startuml 04_activite_virement
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+skinparam shadowing false
+skinparam StateStartColor #000000
+skinparam ActivityStartColor #000000
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+skinparam ActivityBorderColor #1F5FAD
+skinparam SwimlaneTitleFontStyle bold
+
+title MiniBank — Processus de virement (diagramme d'activité)
+
+|Client|
+start
+:Saisir compte cible, montant et motif;
+|Application web|
+:Contrôler le formulaire;
+if (Champs valides ?) then (non)
+  :Afficher les erreurs sous les champs;
+  stop
+else (oui)
+endif
+:Envoyer la demande avec une clé d'idempotence;
+|Service Virements|
+if (Clé d'idempotence déjà connue ?) then (oui)
+  :Renvoyer le résultat déjà enregistré;
+  note right: Aucun second débit :\nle client a juste cliqué deux fois
+  stop
+else (non)
+endif
+:Enregistrer le virement (statut RECU);
+if (Plafond dépassé ?) then (oui)
+  :Rejeter : PLAFOND_DEPASSE;
+  stop
+else (non)
+endif
+if (Montant ≥ 1 000 € ?) then (oui)
+  |Service Fraude|
+  :Calculer le score de risque;
+  |Service Virements|
+  if (Score ≥ 70 ?) then (oui)
+    :Rejeter : RISQUE_FRAUDE;
+    stop
+  else (non)
+  endif
+else (non)
+endif
+|Service Comptes|
+:Débiter le compte source;
+if (Solde suffisant ?) then (non)
+  |Service Virements|
+  :Rejeter : SOLDE_INSUFFISANT;
+  stop
+else (oui)
+endif
+|Service Comptes|
+:Créditer le compte cible;
+|Service Virements|
+:Passer le virement à EXECUTE;
+fork
+  :Publier l'événement\n« virement exécuté » (Kafka);
+fork again
+  :Répondre 201 Created;
+end fork
+|Client|
+:Voir la confirmation et le nouveau solde;
+stop
+
+legend right
+<b>Clé de lecture — activité</b>
+|= Symbole |= Signification |
+| Point noir plein | <b>Début</b> du processus |
+| Rectangle arrondi | <b>Action</b> (verbe à l'infinitif) |
+| Losange / if | <b>Décision</b> : une question, chaque sortie porte une (réponse) |
+| Double cercle (cible) | <b>Fin</b> du processus (ici aussi les fins en erreur) |
+| Barre épaisse (fork) | Les branches se déroulent <b>en parallèle</b> |
+| Colonnes (couloirs) | <b>Qui</b> réalise l'action : acteur ou composant |
+| Note | Explication libre, sans effet sur le flux |
+<b>Méthode</b> : partir du point noir, suivre les flèches ;
+à chaque losange, choisir une réponse et continuer.
+Compter les fins : chacune est un scénario à tester.
+endlegend
+@enduml

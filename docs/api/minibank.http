@@ -1,0 +1,95 @@
+### =============================================================================
+### MiniBank — appels d'API prêts à exécuter dans VS Code
+### Extension : « REST Client » (Huachao Mao). Cliquer sur « Send Request »
+### au-dessus de chaque requête. Le service doit tourner (mvnw spring-boot:run).
+### « ### » sépare les requêtes ; « @nom = valeur » déclare une variable.
+### =============================================================================
+
+@base = http://localhost:8080
+@compteA = MB0000000001
+@compteB = MB0000000003
+
+### 0. Le service est-il vivant ? (attendu : 200, "status": "UP")
+GET {{base}}/actuator/health
+
+### 1. Ouvrir un compte (attendu : 201 + en-tête Location)
+# @name ouverture
+POST {{base}}/api/comptes
+Content-Type: application/json
+
+{
+  "titulaire": "Claire Martin",
+  "type": "COURANT"
+}
+
+### 2. Réutiliser le numéro renvoyé par la requête précédente (variable de réponse)
+@numeroCree = {{ouverture.response.body.$.numero}}
+GET {{base}}/api/comptes/{{numeroCree}}
+
+### 3. Déposer 1 000 € (attendu : 200, solde 1000.00)
+POST {{base}}/api/comptes/{{numeroCree}}/depots
+Content-Type: application/json
+
+{ "montant": 1000.00 }
+
+### 4. Montant invalide (attendu : 400, code VALIDATION, champ "montant")
+POST {{base}}/api/comptes/{{numeroCree}}/depots
+Content-Type: application/json
+
+{ "montant": -5 }
+
+### 5. Retrait supérieur au solde (attendu : 422, code SOLDE_INSUFFISANT)
+POST {{base}}/api/comptes/{{numeroCree}}/retraits
+Content-Type: application/json
+
+{ "montant": 999999.00 }
+
+### 6. Virement (attendu : 201). Rejouer EXACTEMENT la même requête :
+###    avec l'idempotence (bonus), la réponse est identique et rien n'est redébité.
+POST {{base}}/api/virements
+Content-Type: application/json
+Idempotency-Key: 7f3c2a1e-9b8d-4c6f-a2e1-5d4b3c2a1f00
+
+{
+  "compteSource": "{{numeroCree}}",
+  "compteCible": "{{compteB}}",
+  "montant": 250.00,
+  "motif": "Loyer octobre"
+}
+
+### 7. Virement vers le même compte (attendu : 422, code MEME_COMPTE)
+POST {{base}}/api/virements
+Content-Type: application/json
+Idempotency-Key: 0b9e6c1a-3d2f-4e5a-8b7c-6d5e4f3a2b10
+
+{
+  "compteSource": "{{numeroCree}}",
+  "compteCible": "{{numeroCree}}",
+  "montant": 10.00
+}
+
+### 8. Compte inexistant (attendu : 404, code COMPTE_INTROUVABLE)
+GET {{base}}/api/comptes/MB9999999999
+
+### 9. Historique, page 0, 20 lignes
+GET {{base}}/api/comptes/{{numeroCree}}/operations?page=0&size=20
+
+### 10. Bloquer puis tenter un retrait (attendu : 422, code COMPTE_INDISPONIBLE)
+POST {{base}}/api/comptes/{{numeroCree}}/blocage
+Content-Type: application/json
+
+{ "motif": "Vol de carte déclaré" }
+
+###
+POST {{base}}/api/comptes/{{numeroCree}}/retraits
+Content-Type: application/json
+
+{ "montant": 10.00 }
+
+### 11. Débloquer (attendu : 204)
+DELETE {{base}}/api/comptes/{{numeroCree}}/blocage
+
+### 12. (Phase 3) Avec un jeton : coller le jeton obtenu auprès de Keycloak
+# @token = eyJhbGciOi...
+# GET {{base}}/api/comptes/{{compteA}}
+# Authorization: Bearer {{token}}

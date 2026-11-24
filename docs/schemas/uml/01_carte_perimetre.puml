@@ -1,0 +1,69 @@
+' ============================================================================
+' MiniBank — 01. Carte mentale du périmètre fonctionnel
+' Étape de la méthode : ANALYSE (cadrage) — on délimite ce qu'on fait et ce
+' qu'on ne fait pas, AVANT de dessiner quoi que ce soit d'autre.
+' Aperçu dans VS Code : extension « PlantUML » (jebbs), puis Alt + D.
+' En ligne : copier-coller sur https://www.plantuml.com/plantuml
+' ============================================================================
+@startmindmap 01_carte_perimetre
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+
+title MiniBank — Périmètre fonctionnel (carte mentale)
+
+*[#DCE8F7] MiniBank\nbanque en ligne
+** Comptes
+*** Ouvrir un compte (courant, épargne)
+*** Consulter solde et détail
+*** Dépôt / retrait (guichet)
+*** Historique des opérations
+*** Bloquer / débloquer / clôturer
+** Virements internes
+*** Virement entre comptes MiniBank
+*** Plafonds (par opération, par jour)
+*** Idempotence (pas de double débit)
+*** Suivi du statut
+** Sécurité
+*** Connexion OIDC (Keycloak)
+*** Rôles : client, conseiller, admin
+*** Journal d'audit
+** Événements
+*** Kafka « virement exécuté »
+*** Notifications
+*** Audit asynchrone
+** Fraude
+*** Score de risque
+*** Décision : accepter / refuser
+** Application web
+*** Tableau de bord
+*** Formulaire de virement
+*** Historique filtrable
+** Industrialisation
+*** Tests automatisés
+*** CI/CD GitHub Actions
+*** Qualité (SonarCloud)
+*** Supervision
+left side
+**[#F6E3E3] Hors périmètre (V1)
+*** Cartes bancaires
+*** Crédits et prêts
+*** Virements SEPA vers d'autres banques
+*** Multi-devises
+*** Application mobile native
+*** Paiement réel / argent réel
+
+legend right
+<b>Clé de lecture — carte mentale</b>
+|= Élément |= Signification |
+| Nœud central (bleu) | Le système étudié |
+| Branches à droite | Domaines fonctionnels <b>dans</b> le périmètre |
+| Sous-branches | Fonctionnalités de chaque domaine |
+| Branche à gauche (rouge) | <b>Hors périmètre</b> : écrit noir sur blanc pour éviter les malentendus |
+<b>Méthode</b> : lire du centre vers l'extérieur, une branche à la fois.
+Chaque branche deviendra un module du cahier des charges.
+endlegend
+@endmindmap

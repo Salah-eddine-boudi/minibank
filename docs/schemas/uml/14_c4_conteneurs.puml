@@ -1,0 +1,54 @@
+' ============================================================================
+' MiniBank — 14. Modèle C4, niveau 2 : diagramme de CONTENEURS
+' On zoome dans MiniBank : chaque « conteneur » est une application ou une
+' base qui se déploie séparément (rien à voir avec un conteneur Docker,
+' même si chacun finira dans un conteneur Docker).
+' ============================================================================
+@startuml 14_c4_conteneurs
+!include <C4/C4_Container>
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+
+title MiniBank — C4 niveau 2 : conteneurs (architecture cible)
+
+Person(client, "Client", "Particulier")
+Person(conseiller, "Conseiller", "Agence")
+
+System_Boundary(mb, "MiniBank") {
+  Container(spa, "Application web", "Angular, TypeScript", "Tableau de bord, virements, historique")
+  Container(gw, "API Gateway", "Spring Cloud Gateway", "Point d'entrée unique : routage, vérification JWT, limitation de débit")
+  Container(comptes, "Service Comptes", "Java 25, Spring Boot", "Comptes, soldes, opérations")
+  ContainerDb(dbc, "Base comptes", "PostgreSQL 17", "client, compte, operation")
+  Container(virements, "Service Virements", "Java 25, Spring Boot", "Orchestration des virements, idempotence, outbox")
+  ContainerDb(dbv, "Base virements", "PostgreSQL 17", "virement, outbox_evenement")
+  Container(fraude, "Service Fraude", "C#, ASP.NET Core", "Score de risque d'un virement")
+  ContainerQueue(kafka, "Bus d'événements", "Apache Kafka (KRaft)", "Topic virements")
+  Container(notif, "Service Notifications", "Java, Spring Boot", "Messages au client")
+  Container(audit, "Service Audit", "Java, Spring Boot", "Journal d'audit immuable")
+  ContainerDb(dba, "Base audit", "PostgreSQL 17", "journal_audit")
+}
+
+System_Ext(idp, "Keycloak", "OIDC, rôles")
+System_Ext(mail, "Serveur e-mail", "Mailpit en local")
+
+Rel(client, spa, "Utilise", "HTTPS")
+Rel(conseiller, spa, "Utilise", "HTTPS")
+Rel(spa, idp, "Connexion", "OIDC + PKCE")
+Rel(spa, gw, "Appelle", "JSON / HTTPS + JWT")
+Rel(gw, comptes, "Route /api/comptes", "HTTP")
+Rel(gw, virements, "Route /api/virements", "HTTP")
+Rel(gw, idp, "Clés publiques", "JWKS")
+Rel(comptes, dbc, "Lit / écrit", "JDBC")
+Rel(virements, dbv, "Lit / écrit", "JDBC")
+Rel(virements, fraude, "Évalue le risque", "REST")
+Rel(virements, comptes, "Débite / crédite", "REST")
+Rel(virements, kafka, "Publie VirementExecute", "Kafka")
+Rel(kafka, notif, "Consomme", "Kafka")
+Rel(kafka, audit, "Consomme", "Kafka")
+Rel(audit, dba, "Écrit", "JDBC")
+Rel(notif, mail, "Envoie", "SMTP")
+
+SHOW_LEGEND()
+
+footer Lecture : chaque boîte se déploie seule ; chaque flèche dit QUOI et avec QUELLE techno. Une base appartient à un seul service.
+@enduml

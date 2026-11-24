@@ -1,0 +1,67 @@
+' ============================================================================
+' MiniBank — 10. Séquence : connexion OIDC (Authorization Code + PKCE)
+' Phase 3 — comment le front obtient un jeton JWT auprès de Keycloak, et
+' comment l'API le vérifie. C'est LE flux standard des applications web.
+' ============================================================================
+@startuml 10_sequence_authentification_oidc
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+skinparam shadowing false
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+skinparam sequenceMessageAlign center
+skinparam ParticipantBorderColor #1F5FAD
+autonumber
+
+title MiniBank — Connexion OIDC (code d'autorisation + PKCE) et appel d'API
+
+actor "Client" as U
+participant "Application web\n(Angular)" as F
+participant "Keycloak\n(fournisseur d'identité)" as K #DCE8F7
+participant "API Gateway" as G
+participant "Service Comptes" as S
+
+U -> F : clique « Se connecter »
+F -> F : génère code_verifier (secret)\net code_challenge = SHA-256(code_verifier)
+F -> K : redirection /auth?client_id=minibank-web\n&code_challenge=…&redirect_uri=…
+K -> U : page de connexion Keycloak
+U -> K : identifiant + mot de passe (+ second facteur)
+K --> F : redirection vers redirect_uri avec ?code=AUTH_CODE
+F -> K : POST /token (code + code_verifier)
+K -> K : vérifie SHA-256(code_verifier) = code_challenge
+K --> F : access_token (JWT, 5 min)\n+ refresh_token + id_token
+
+== Appel d'une API protégée ==
+
+F -> G : GET /api/comptes\nAuthorization: Bearer <access_token>
+G -> G : vérifie signature (clés publiques JWKS en cache),\nexpiration, émetteur
+alt jeton absent, invalide ou expiré
+  G --> F : 401 Unauthorized
+  F -> K : POST /token (refresh_token)
+  K --> F : nouvel access_token
+else jeton valide
+  G -> S : GET /api/comptes (+ jeton)
+  S -> S : rôle CLIENT ? comptes du client (sub du jeton) ?
+  alt le compte demandé n'appartient pas au client
+    S --> G : 403 Forbidden (ou 404 pour ne rien révéler)
+  else accès autorisé
+    S --> G : 200 OK + comptes
+  end
+  G --> F : réponse
+end
+
+legend right
+<b>Clé de lecture</b>
+|= Élément |= Signification |
+| == Titre == | Sépare deux temps du scénario |
+| Flèche vers soi | Calcul local (aucun échange réseau) |
+| JWT | Jeton signé : en-tête.charge.signature (lisible, non modifiable) |
+| PKCE | Preuve que celui qui échange le code est celui qui l'a demandé |
+| 401 / 403 | Non authentifié (qui es-tu ?) / authentifié mais interdit |
+<b>Méthode</b> : repérer d'abord QUI détient quoi
+(code, code_verifier, jetons), puis suivre où chaque secret voyage.
+Le mot de passe n'est jamais vu par MiniBank, seulement par Keycloak.
+endlegend
+@enduml

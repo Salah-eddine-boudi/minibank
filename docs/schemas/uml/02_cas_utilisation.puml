@@ -1,0 +1,88 @@
+' ============================================================================
+' MiniBank — 02. Diagramme de cas d'utilisation (vue d'ensemble)
+' Étape de la méthode : ANALYSE — QUI fait QUOI avec le système ?
+' Ne décrit PAS comment c'est fait (pas d'écran, pas de technique).
+' ============================================================================
+@startuml 02_cas_utilisation
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+skinparam shadowing false
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #1F5FAD
+}
+left to right direction
+
+title MiniBank — Diagramme de cas d'utilisation
+
+actor "Client" as Client
+actor "Conseiller" as Conseiller
+actor "Administrateur" as Admin
+actor "Planificateur\n<<système>>" as Horloge
+
+rectangle "Système MiniBank" {
+  rectangle "Espace client" {
+    usecase "Consulter ses comptes" as UC_CONS
+    usecase "Consulter l'historique\ndes opérations" as UC_HIST
+    usecase "Effectuer un virement" as UC_VIR #DCE8F7
+    usecase "Contrôler solde\net plafonds" as UC_PLAF
+    usecase "Évaluer le risque\nde fraude" as UC_RISK
+    usecase "Notifier le client" as UC_NOTIF
+  }
+  rectangle "Back-office agence" {
+    usecase "Ouvrir un compte" as UC_OUV
+    usecase "Enregistrer un dépôt\nou un retrait" as UC_DEP
+    usecase "Bloquer / débloquer\nun compte" as UC_BLOQ
+    usecase "Clôturer un compte" as UC_CLOT
+  }
+  rectangle "Administration" {
+    usecase "Gérer les utilisateurs\net leurs rôles" as UC_USERS
+    usecase "Consulter le journal\nd'audit" as UC_AUDIT
+  }
+  usecase "Calculer les intérêts\nmensuels" as UC_INT
+}
+note as NPRE
+  <b>Précondition commune</b> : client, conseiller et
+  administrateur sont <b>authentifiés</b> (Keycloak, OIDC).
+  Se connecter est une précondition, pas un objectif :
+  on ne le dessine donc pas comme un cas d'utilisation.
+end note
+
+actor "Service Fraude\n<<système>>" as Fraude
+
+
+Client --> UC_CONS
+Client --> UC_HIST
+Client --> UC_VIR
+Conseiller --> UC_OUV
+Conseiller --> UC_DEP
+Conseiller --> UC_BLOQ
+Conseiller --> UC_CLOT
+Conseiller --> UC_CONS
+Admin --> UC_USERS
+Admin --> UC_AUDIT
+Horloge --> UC_INT
+
+UC_VIR ..> UC_PLAF : <<include>>
+UC_RISK ..> UC_VIR : <<extend>>\n[montant ≥ 1 000 €]
+UC_NOTIF ..> UC_VIR : <<extend>>\n[virement exécuté]
+UC_RISK -- Fraude
+
+legend right
+<b>Clé de lecture — cas d'utilisation</b>
+|= Symbole |= Signification |
+| Bonhomme | <b>Acteur</b> : un RÔLE (pas une personne précise) ou un système externe |
+| Ovale | <b>Cas d'utilisation</b> : un objectif de l'acteur, écrit « verbe + complément » |
+| Grand rectangle | <b>Frontière du système</b> : tout ce qui est dedans est à développer |
+| Trait plein | L'acteur participe à ce cas |
+| Flèche à triangle vide | <b>Généralisation</b> (non utilisée ici) : « A EST UN B », A hérite des cas de B |
+| Pointillés <U+00AB>include<U+00BB> | Le cas de base appelle TOUJOURS le cas inclus |
+| Pointillés <U+00AB>extend<U+00BB> | Le cas extension s'ajoute PARFOIS, si la [condition] est vraie |
+<b>Méthode</b> : 1) lister les acteurs  2) pour chacun, suivre ses traits
+3) lire les «include»/«extend» en dernier. Le bleu marque le cas central.
+endlegend
+@enduml

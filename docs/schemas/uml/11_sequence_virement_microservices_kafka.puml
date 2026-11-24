@@ -1,0 +1,76 @@
+' ============================================================================
+' MiniBank — 11. Séquence : virement en MICROSERVICES avec KAFKA (phases 4-6)
+' Montre : appels synchrones (REST), compensation (saga), pattern outbox,
+' publication asynchrone et consommateurs idempotents.
+' ============================================================================
+@startuml 11_sequence_virement_microservices_kafka
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+skinparam shadowing false
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+skinparam sequenceMessageAlign center
+skinparam ParticipantBorderColor #1F5FAD
+autonumber
+
+title MiniBank — Virement en microservices : REST synchrone + Kafka asynchrone
+
+participant "API Gateway" as G
+participant "Service\nVirements" as V #DCE8F7
+database "Base\nvirements" as DBV
+participant "Service\nFraude (.NET)" as F
+participant "Service\nComptes" as C
+queue "Kafka\ntopic virements" as K
+participant "Service\nNotifications" as N
+participant "Service\nAudit" as A
+
+G -> V : POST /api/virements (JWT, Idempotency-Key)
+V -> DBV : INSERT virement (RECU)\n[clé d'idempotence unique]
+
+opt montant ≥ 1 000 €
+  V -> F : POST /api/evaluations\n(délai max 2 s, disjoncteur)
+  F --> V : {score: 35, decision: ACCEPTER}
+end
+
+V -> C : POST /api/comptes/{source}/debits
+C --> V : 200 OK (débit enregistré)
+V -> C : POST /api/comptes/{cible}/credits
+
+alt le crédit échoue (service indisponible)
+  V -> C : POST /api/comptes/{source}/credits\n(COMPENSATION : on rend l'argent)
+  V -> DBV : UPDATE virement SET statut = ECHOUE
+  V --> G : 503 / statut ECHOUE
+else crédit réussi
+  C --> V : 200 OK
+  group Transaction locale unique (pattern OUTBOX)
+    V -> DBV : UPDATE virement SET statut = EXECUTE
+    V -> DBV : INSERT outbox_evenement (VirementExecute)
+  end
+  V --> G : 201 Created
+end
+
+== Plus tard, en asynchrone (quelques millisecondes) ==
+
+V -> DBV : relais outbox : lit les événements non publiés
+V -> K : publie VirementExecute (clé = numéro de compte)
+K ->> N : livre l'événement (groupe « notifications »)
+N -> N : déjà traité ? (eventId)\nsinon envoie la notification
+K ->> A : livre l'événement (groupe « audit »)
+A -> A : déjà traité ? (eventId)\nsinon écrit dans le journal
+
+legend right
+<b>Clé de lecture</b>
+|= Élément |= Signification |
+| Cylindre / file | Base de données / <b>topic</b> Kafka |
+| Flèche pleine | Appel <b>synchrone</b> : on attend la réponse |
+| Flèche à pointe ouverte | Message <b>asynchrone</b> : on n'attend pas |
+| opt | Bloc optionnel, exécuté seulement si [condition] |
+| group | Regroupe des étapes (ici une seule transaction) |
+| Compensation | Annule une étape déjà faite (il n'y a pas de transaction globale entre services) |
+| Outbox | L'événement est écrit dans la MÊME transaction que le statut, puis publié : jamais perdu |
+<b>Méthode</b> : séparer le synchrone (haut) de l'asynchrone (après ==),
+puis chercher à chaque étape « et si ça tombe en panne ICI ? »
+endlegend
+@enduml

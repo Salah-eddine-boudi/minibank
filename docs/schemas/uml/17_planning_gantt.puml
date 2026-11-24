@@ -1,0 +1,39 @@
+' ============================================================================
+' MiniBank — 17. Planning prévisionnel (diagramme de Gantt)
+' Hypothèse : environ 8 à 10 h de travail par semaine en parallèle des cours.
+' À ajuster à chaque fin de phase : un planning est un outil vivant.
+' ============================================================================
+@startgantt 17_planning_gantt
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+language fr
+printscale weekly
+title MiniBank — Planning prévisionnel des phases
+Project starts 2026-10-10
+
+[Phase 0 — Environnement] starts 2026-10-10 and lasts 1 day
+[Phase 0 — Environnement] is 100% completed
+[Phase 0 — Environnement] is colored in #A9D5A9
+
+[Phase 1 — Service Comptes (API, JPA, tests)] starts 2026-10-13 and lasts 21 days
+[Phase 1 — Service Comptes (API, JPA, tests)] is colored in #DCE8F7/#1F5FAD
+[Phase 2 — Application Angular] starts at [Phase 1 — Service Comptes (API, JPA, tests)]'s end and lasts 14 days
+[Jalon : MVP démontrable] happens at [Phase 2 — Application Angular]'s end
+[Phase 3 — Sécurité (Keycloak, JWT, rôles)] starts at [Phase 2 — Application Angular]'s end and lasts 10 days
+[Phase 4 — Découpage microservices + Gateway] starts at [Phase 3 — Sécurité (Keycloak, JWT, rôles)]'s end and lasts 14 days
+[Phase 5 — Kafka, notifications, audit] starts at [Phase 4 — Découpage microservices + Gateway]'s end and lasts 10 days
+[Phase 6 — Service Fraude en .NET] starts at [Phase 5 — Kafka, notifications, audit]'s end and lasts 10 days
+[Phase 7 — Industrialisation (CI/CD, qualité)] starts at [Phase 6 — Service Fraude en .NET]'s end and lasts 7 days
+[Jalon : V1 complète, démo portfolio] happens at [Phase 7 — Industrialisation (CI/CD, qualité)]'s end
+[Phase 8 — Bonus (batch, supervision, cloud)] starts at [Phase 7 — Industrialisation (CI/CD, qualité)]'s end and lasts 14 days
+
+legend
+<b>Clé de lecture — Gantt</b>
+| Barre | Tâche : début, durée, fin |
+| Partie verte / % | Avancement réalisé |
+| Losange | <b>Jalon</b> : date de contrôle, durée nulle |
+| Barre qui commence à la fin d'une autre | Dépendance « fin -> début » |
+<b>Méthode</b> : lire de gauche à droite ; la chaîne de dépendances
+la plus longue est le <b>chemin critique</b> : un retard dessus décale la fin.
+endlegend
+@endgantt

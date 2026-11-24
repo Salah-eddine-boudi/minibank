@@ -1,0 +1,59 @@
+' ============================================================================
+' MiniBank — 15. Diagramme de composants UML (interfaces fournies / requises)
+' Vue « contrats » : qui FOURNIT une interface, qui la REQUIERT.
+' Utile pour discuter des dépendances et de ce qui casse si on change une API.
+' ============================================================================
+@startuml 15_composants
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+skinparam shadowing false
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+skinparam component {
+  BorderColor #1F5FAD
+}
+
+title MiniBank — Composants et interfaces
+
+component "Application web\n(Angular)" as SPA
+component "API Gateway" as GW
+component "Service Comptes" as COMPTES #DCE8F7
+component "Service Virements" as VIR
+component "Service Fraude" as FRAUDE
+component "Service Notifications" as NOTIF
+component "Service Audit" as AUDIT
+queue "Kafka" as KAFKA
+
+interface "API REST\nComptes" as I_COMPTES
+interface "API REST\nVirements" as I_VIR
+interface "API REST\nÉvaluations" as I_FRAUDE
+interface "Événement\nVirementExecute" as I_EVT
+
+COMPTES -up- I_COMPTES
+VIR -up- I_VIR
+FRAUDE -up- I_FRAUDE
+KAFKA - I_EVT
+
+SPA ..> GW : HTTPS
+GW ..> I_COMPTES
+GW ..> I_VIR
+VIR ..> I_COMPTES
+VIR ..> I_FRAUDE
+VIR ..> KAFKA : publie
+NOTIF ..> I_EVT : s'abonne
+AUDIT ..> I_EVT : s'abonne
+
+legend right
+<b>Clé de lecture — composants</b>
+|= Symbole |= Signification |
+| Boîte avec deux petits rectangles | <b>Composant</b> : brique remplaçable et déployable |
+| Rond (sucette) relié par un trait | <b>Interface fournie</b> : ce que le composant offre |
+| Flèche pointillée vers une interface | <b>Interface requise</b> : ce dont il a besoin |
+| File | Bus de messages (Kafka) |
+<b>Méthode</b> : pour chaque interface, compter les flèches entrantes :
+c'est le nombre de composants à prévenir si le contrat change.
+Ici l'API Comptes a 2 consommateurs : la versionner (/v1).
+endlegend
+@enduml

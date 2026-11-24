@@ -1,0 +1,123 @@
+' ============================================================================
+' MiniBank — 12. Modèle physique de données (MLD / MPD, notation « pattes de
+' corbeau »). Une base PAR service : aucune clé étrangère entre deux bases.
+' ============================================================================
+@startuml 12_modele_donnees
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+skinparam shadowing false
+skinparam linetype ortho
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+skinparam entity {
+  BorderColor #1F5FAD
+}
+hide circle
+
+title MiniBank — Modèle physique de données (PostgreSQL)
+
+package "Base « comptes » (service Comptes)" #F2F7FD {
+  entity "client" as client {
+    * id : BIGSERIAL <<PK>>
+    --
+    * numero_client : VARCHAR(12) <<UK>>
+    * nom : VARCHAR(100)
+    * prenom : VARCHAR(100)
+    * email : VARCHAR(255) <<UK>>
+    * id_keycloak : VARCHAR(36) <<UK>>
+    * date_creation : TIMESTAMPTZ
+  }
+
+  entity "compte" as compte #DCE8F7 {
+    * id : BIGSERIAL <<PK>>
+    --
+    * numero : VARCHAR(12) <<UK>>
+    * client_id : BIGINT <<FK>>
+    * type : VARCHAR(10)  CHECK (COURANT, EPARGNE)
+    * solde : NUMERIC(19,2)  CHECK (solde >= 0)
+    * statut : VARCHAR(10)  CHECK (ACTIF, BLOQUE, CLOTURE)
+    * date_creation : TIMESTAMPTZ
+    * version : BIGINT
+  }
+
+  entity "operation" as operation {
+    * id : BIGSERIAL <<PK>>
+    --
+    * compte_id : BIGINT <<FK>>
+    * type : VARCHAR(15)
+    * montant : NUMERIC(19,2)  CHECK (montant > 0)
+    * solde_apres : NUMERIC(19,2)
+    * date_operation : TIMESTAMPTZ
+    * reference : VARCHAR(36)
+    libelle : VARCHAR(140)
+  }
+}
+
+package "Base « virements » (service Virements)" #F7F4FD {
+  entity "virement" as virement {
+    * id : BIGSERIAL <<PK>>
+    --
+    * reference : UUID <<UK>>
+    * compte_source : VARCHAR(12)
+    * compte_cible : VARCHAR(12)
+    * montant : NUMERIC(19,2)  CHECK (montant > 0)
+    motif : VARCHAR(140)
+    * statut : VARCHAR(12)
+    motif_rejet : VARCHAR(40)
+    * cle_idempotence : VARCHAR(64) <<UK>>
+    * date_creation : TIMESTAMPTZ
+    date_execution : TIMESTAMPTZ
+  }
+
+  entity "outbox_evenement" as outbox {
+    * id : UUID <<PK>>
+    --
+    * type_agregat : VARCHAR(30)
+    * id_agregat : VARCHAR(36)
+    * type_evenement : VARCHAR(50)
+    * payload : JSONB
+    * date_creation : TIMESTAMPTZ
+    date_publication : TIMESTAMPTZ
+  }
+}
+
+package "Base « audit » (service Audit)" #F4F4F4 {
+  entity "journal_audit" as audit {
+    * id : BIGSERIAL <<PK>>
+    --
+    * id_evenement : UUID <<UK>>
+    * date_evenement : TIMESTAMPTZ
+    * acteur : VARCHAR(100)
+    * action : VARCHAR(50)
+    * ressource : VARCHAR(100)
+    details : JSONB
+  }
+}
+
+client ||--o{ compte : possède
+compte ||--o{ operation : enregistre
+virement }o..|| outbox : produit 0 ou 1 événement
+
+note bottom of virement
+  compte_source et compte_cible sont de simples
+  numéros : PAS de clé étrangère vers une autre base.
+  La cohérence est assurée par le service, pas par SQL.
+end note
+
+legend right
+<b>Clé de lecture — modèle de données (pattes de corbeau)</b>
+|= Symbole |= Signification |
+| Boîte | <b>Table</b> ; au-dessus du trait : la clé primaire |
+| Petit rond devant la colonne | Colonne <b>NOT NULL</b> (écrite avec * dans le source) |
+| <<PK>> / <<FK>> / <<UK>> | Clé primaire / clé étrangère / contrainte d'unicité |
+| Deux petits traits | Côté « exactement un » |
+| Rond + patte de corbeau | Côté « zéro ou plusieurs » |
+| Trait + patte de corbeau | Côté « un ou plusieurs » (non utilisé ici) |
+| Trait plein / pointillé | Clé étrangère réelle / lien logique (sans contrainte SQL) |
+<b>Méthode</b> : lire chaque lien dans les deux sens :
+« un client possède 0 à n comptes » ; « un compte appartient à exactement 1 client ».
+NUMERIC(19,2) : 19 chiffres dont 2 décimales, jamais FLOAT pour de l'argent.
+endlegend
+@enduml

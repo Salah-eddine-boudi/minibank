@@ -1,0 +1,141 @@
+' ============================================================================
+' MiniBank — 08. Diagramme de classes de CONCEPTION : service Comptes
+' Étape de la méthode : CONCEPTION — la vraie structure du code Spring Boot,
+' couche par couche (web -> service -> repository -> domain).
+' ============================================================================
+@startuml 08_classes_conception_service_comptes
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 110
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle folder
+set separator none
+skinparam nodesep 25
+skinparam ranksep 45
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+skinparam class {
+  BorderColor #1F5FAD
+}
+
+title MiniBank — Conception du service Comptes (architecture en couches)
+
+package "com.minibank.comptes.web" {
+  class CompteController <<@RestController>> {
+    - compteService : CompteService
+    + ouvrir(req : CreerCompteRequest) : ResponseEntity<CompteResponse>
+    + consulter(numero : String) : CompteResponse
+    + deposer(numero : String, req : MontantRequest) : CompteResponse
+    + retirer(numero : String, req : MontantRequest) : CompteResponse
+    + historique(numero : String, page : Pageable) : Page<OperationResponse>
+  }
+  class VirementController <<@RestController>> {
+    - compteService : CompteService
+    + virer(cle : String, req : VirementRequest) : ResponseEntity<VirementResponse>
+  }
+  class GlobalExceptionHandler <<@RestControllerAdvice>> {
+    + compteIntrouvable(e) : ProblemDetail
+    + regleMetier(e) : ProblemDetail
+    + validation(e) : ProblemDetail
+    + conflitVersion(e) : ProblemDetail
+  }
+}
+
+package "com.minibank.comptes.dto" {
+  class CreerCompteRequest <<record>> {
+    titulaire : String
+    type : TypeCompte
+  }
+  class MontantRequest <<record>> {
+    montant : BigDecimal
+  }
+  class VirementRequest <<record>> {
+    compteSource : String
+    compteCible : String
+    montant : BigDecimal
+    motif : String
+  }
+  class CompteResponse <<record>>
+  class OperationResponse <<record>>
+  class VirementResponse <<record>>
+}
+
+package "com.minibank.comptes.service" #F2F7FD {
+  class CompteService <<@Service>> {
+    - compteRepository : CompteRepository
+    - operationRepository : OperationRepository
+    + ouvrir(...) : CompteResponse  <<@Transactional>>
+    + consulter(numero) : CompteResponse  <<readOnly>>
+    + deposer(...) : CompteResponse  <<@Transactional>>
+    + retirer(...) : CompteResponse  <<@Transactional>>
+    + virer(...) : VirementResponse  <<@Transactional>>
+    + historique(...) : Page<OperationResponse>  <<readOnly>>
+  }
+}
+
+package "com.minibank.comptes.repository" {
+  interface CompteRepository {
+    + findByNumero(numero : String) : Optional<Compte>
+  }
+  interface OperationRepository {
+    + findByCompteNumeroOrderByDateOperationDesc(numero, page) : Page<Operation>
+  }
+  interface "JpaRepository<T, ID>" as JpaRepository <<Spring Data>>
+}
+
+package "com.minibank.comptes.domain" {
+  class Compte <<@Entity>>
+  class Operation <<@Entity>>
+}
+
+package "com.minibank.comptes.exception" {
+  class CompteIntrouvableException
+  class SoldeInsuffisantException
+  class MontantInvalideException
+  class "RuntimeException" as RTE <<java.lang>>
+}
+
+CompteController --> CompteService
+VirementController --> CompteService
+CompteController ..> CreerCompteRequest
+CompteController ..> MontantRequest
+VirementController ..> VirementRequest
+CompteService ..> CompteResponse : crée
+CompteService ..> OperationResponse : crée
+CompteService ..> VirementResponse : crée
+CompteService --> CompteRepository
+CompteService --> OperationRepository
+CompteRepository --|> JpaRepository
+OperationRepository --|> JpaRepository
+CompteRepository ..> Compte
+OperationRepository ..> Operation
+Compte "1" *-- "0..*" Operation
+CompteIntrouvableException --|> RTE
+SoldeInsuffisantException --|> RTE
+MontantInvalideException --|> RTE
+CompteService ..> CompteIntrouvableException : lève
+Compte ..> SoldeInsuffisantException : lève
+GlobalExceptionHandler ..> RTE : traduit en\n400 / 404 / 409 / 422
+
+note top of CompteService
+  La logique et les transactions vivent ICI.
+  Le contrôleur ne fait que : recevoir, valider (@Valid),
+  appeler le service, renvoyer le bon code HTTP.
+end note
+
+legend bottom
+<b>Clé de lecture — conception</b>
+|= Symbole |= Signification |
+| Dossier (package) | Un <b>package Java</b> = une couche |
+| <<@RestController>>... | <b>Annotation Spring</b> portée par la classe |
+| <<record>> | Classe de données immuable Java (DTO) |
+| Cercle « I » / interface | <b>Interface</b> : un contrat, Spring génère l'implémentation |
+| Flèche pleine -> | Association : le champ est injecté (constructeur) |
+| Pointillés -> | Dépendance : utilise ou crée temporairement |
+| Triangle vide | Héritage (extends) |
+<b>Règle des couches</b> : les flèches descendent toujours
+web -> service -> repository -> domain, jamais l'inverse.
+endlegend
+@enduml

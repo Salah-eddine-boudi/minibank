@@ -1,0 +1,92 @@
+' ============================================================================
+' MiniBank — 09. Diagramme de séquence de CONCEPTION : virement (phase 1)
+' Étape de la méthode : CONCEPTION — on ouvre la boîte noire du n°03 :
+' quelles classes s'appellent, dans quel ordre, avec quelle transaction.
+' Correspond exactement au code du service Comptes en phase 1.
+' ============================================================================
+@startuml 09_sequence_virement_phase1
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+skinparam shadowing false
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+skinparam sequenceMessageAlign center
+skinparam ParticipantBorderColor #1F5FAD
+autonumber
+
+title MiniBank — Séquence de conception : POST /api/virements (phase 1)
+
+actor "Client\n(Postman / front)" as UI
+participant ":VirementController" as C
+participant ":CompteService" as S #DCE8F7
+participant "source:Compte" as SRC
+participant "cible:Compte" as CIB
+participant ":CompteRepository" as R
+participant ":OperationRepository" as OR
+database "PostgreSQL" as DB
+
+UI -> C : POST /api/virements\nIdempotency-Key: 7f3c…\n{source, cible, 250.00}
+activate C
+C -> C : @Valid VirementRequest
+alt JSON invalide (montant ≤ 0, champ vide)
+  C --> UI : 400 Bad Request (ProblemDetail + champs)
+else JSON valide
+  C -> S : virer(source, cible, 250.00)
+  activate S
+  note right of S : @Transactional : le proxy Spring\nouvre la transaction (BEGIN)
+  S -> R : findByNumero(source)
+  R -> DB : SELECT … FROM compte WHERE numero = ?
+  DB --> R : ligne (solde 1 000.00, version 3)
+  R --> S : source
+  S -> R : findByNumero(cible)
+  R --> S : cible
+
+  alt un des comptes n'existe pas
+    S --> C : CompteIntrouvableException
+    C --> UI : 404 Not Found
+  else comptes trouvés
+    S -> SRC : debiter(250.00)
+    activate SRC
+    alt solde < montant
+      SRC --> S : SoldeInsuffisantException
+      note right of S : exception unchecked :\nROLLBACK automatique
+      S --> C : exception propagée
+      C --> UI : 422 Unprocessable Content
+    else solde suffisant
+      SRC --> S : solde = 750.00
+      deactivate SRC
+      S -> CIB : crediter(250.00)
+      S -> OR : save(VIREMENT_EMIS) + save(VIREMENT_RECU)
+      S -> DB : fin de méthode : flush + COMMIT\nUPDATE compte SET solde = ?, version = 4\nWHERE id = ? AND version = 3
+      alt quelqu'un a modifié le compte entre-temps (version ≠ 3)
+        DB --> S : 0 ligne modifiée, donc ROLLBACK
+        S --> C : ObjectOptimisticLockingFailureException
+        C --> UI : 409 Conflict (« réessayez »)
+      else version inchangée
+        DB --> S : OK
+        S --> C : VirementResponse
+        deactivate S
+        C --> UI : 201 Created + référence
+      end
+    end
+  end
+end
+deactivate C
+
+legend right
+<b>Clé de lecture — séquence de conception</b>
+|= Symbole |= Signification |
+| :Classe | Un <b>objet</b> anonyme de cette classe |
+| nom:Classe | Un objet nommé (source, cible) |
+| Cylindre | Base de données |
+| Rectangle fin sur la ligne de vie | <b>Activation</b> : l'objet est en train de travailler |
+| Flèche vers soi-même | Appel interne (validation) |
+| alt / else | Alternatives : une seule branche s'exécute |
+| Note | Ce que fait Spring « en coulisse » |
+<b>Méthode</b> : lire de haut en bas en suivant les numéros ;
+pour chaque « alt », se demander « quel code HTTP le client reçoit ? »
+Chaque branche = un test d'intégration.
+endlegend
+@enduml

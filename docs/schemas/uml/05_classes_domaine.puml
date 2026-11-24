@@ -1,0 +1,176 @@
+' ============================================================================
+' MiniBank — 05. Diagramme de classes du DOMAINE (modèle métier)
+' Étape de la méthode : ANALYSE -> CONCEPTION — les concepts métier, leurs
+' données, leurs règles (méthodes) et leurs liens. Aucune technique ici :
+' pas de contrôleur, pas de base de données.
+' ============================================================================
+@startuml 05_classes_domaine
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+skinparam class {
+  BorderColor #1F5FAD
+}
+
+title MiniBank — Diagramme de classes du domaine métier
+
+package "Comptes" {
+  class Client {
+    - id : Long
+    - numeroClient : String {unique}
+    - nom : String
+    - prenom : String
+    - email : String {unique}
+    - idKeycloak : String
+    + nomComplet() : String
+  }
+
+  class Compte #DCE8F7 {
+    - id : Long
+    - numero : String {unique}
+    - type : TypeCompte
+    - solde : BigDecimal
+    - statut : StatutCompte
+    - dateCreation : Instant
+    - version : Long
+    + crediter(montant : BigDecimal) : void
+    + debiter(montant : BigDecimal) : void
+    + bloquer() : void
+    + debloquer() : void
+    + cloturer() : void
+  }
+
+  class Operation <<immuable>> {
+    - id : Long
+    - type : TypeOperation
+    - montant : BigDecimal
+    - soldeApres : BigDecimal
+    - dateOperation : Instant
+    - reference : String
+    - libelle : String
+  }
+
+  enum TypeCompte {
+    COURANT
+    EPARGNE
+  }
+
+  enum StatutCompte {
+    ACTIF
+    BLOQUE
+    CLOTURE
+  }
+
+  enum TypeOperation {
+    DEPOT
+    RETRAIT
+    VIREMENT_EMIS
+    VIREMENT_RECU
+    INTERETS
+  }
+}
+
+package "Virements" {
+  class Virement {
+    - id : Long
+    - reference : UUID {unique}
+    - montant : BigDecimal
+    - motif : String
+    - statut : StatutVirement
+    - motifRejet : String
+    - cleIdempotence : String {unique}
+    - dateCreation : Instant
+    - dateExecution : Instant
+    + valider() : void
+    + executer() : void
+    + rejeter(motif : String) : void
+  }
+
+  enum StatutVirement {
+    RECU
+    EN_CONTROLE
+    VALIDE
+    EXECUTE
+    REJETE
+    ECHOUE
+  }
+}
+
+package "Fraude" {
+  class EvaluationRisque {
+    - score : int {0..100}
+    - decision : Decision
+    - raisons : List<String>
+  }
+  enum Decision {
+    ACCEPTER
+    REFUSER
+  }
+}
+
+package "Transverse" {
+  class JournalAudit <<immuable>> {
+    - id : Long
+    - dateEvenement : Instant
+    - acteur : String
+    - action : String
+    - ressource : String
+    - details : String
+  }
+}
+
+Client "1" -- "0..*" Compte : possède >
+Compte "1" *-- "0..*" Operation : enregistre >
+Virement "0..*" --> "1" Compte : débite (source) >
+Virement "0..*" --> "1" Compte : crédite (cible) >
+Virement "1" ..> "0..2" Operation : génère >
+Virement ..> EvaluationRisque : <<use>>
+
+Compte ..> TypeCompte
+Compte ..> StatutCompte
+Operation ..> TypeOperation
+Virement ..> StatutVirement
+EvaluationRisque ..> Decision
+
+note right of Compte
+  <b>Règles portées par l'objet</b> (encapsulation) :
+  - aucun setter sur le solde ;
+  - debiter() refuse si solde < montant ;
+  - montant toujours > 0 ;
+  - compte BLOQUE : débit refusé ;
+  - cloturer() exige solde = 0.
+end note
+
+note bottom of Operation
+  Une opération n'est jamais modifiée
+  ni supprimée : on en ajoute une autre
+  (écriture inverse). C'est le journal
+  comptable du compte.
+end note
+
+legend right
+<b>Clé de lecture — diagramme de classes</b>
+|= Symbole |= Signification |
+| Boîte à 3 cases | <b>Classe</b> : nom / attributs / méthodes |
+| - devant | <b>privé</b> : invisible hors de la classe |
+| + devant | <b>public</b> : utilisable par les autres classes |
+| # devant | <b>protégé</b> : visible par les sous-classes |
+| nom : Type | Attribut et son type ; méthode(param : Type) : TypeRetour |
+| Trait simple | <b>Association</b> : les objets se connaissent |
+| "1" , "0..*" | <b>Multiplicités</b> : combien d'objets de chaque côté |
+| Losange plein | <b>Composition</b> : la partie meurt avec le tout (opération sans compte : impossible) |
+| Losange vide | <b>Agrégation</b> : la partie peut vivre seule (non utilisée ici) |
+| Triangle vide | <b>Héritage</b> : « est un » (non utilisé ici) |
+| Pointillés -> | <b>Dépendance</b> : utilise temporairement |
+| <<...>> | <b>Stéréotype</b> : précision sur la nature (immuable, enum...) |
+| {...} | <b>Contrainte</b> : règle à respecter (unique, 0..100) |
+<b>Méthode</b> : 1) lire les noms de classes = le vocabulaire métier
+2) les liens et leurs multiplicités, dans les DEUX sens
+3) enfin les attributs et méthodes de la classe centrale (en bleu).
+endlegend
+@enduml

@@ -1,0 +1,52 @@
+' ============================================================================
+' MiniBank — 03. Diagramme de séquence SYSTÈME : « Effectuer un virement »
+' Étape de la méthode : ANALYSE — le système est une BOÎTE NOIRE.
+' On décrit seulement les échanges acteur <-> système, sans l'intérieur.
+' C'est la version « métier » qu'on valide avec le client avant de coder.
+' ============================================================================
+@startuml 03_sequence_systeme_virement
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+skinparam shadowing false
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+skinparam sequenceMessageAlign center
+autonumber
+
+title MiniBank — Séquence système : effectuer un virement (boîte noire)
+
+actor "Client" as Client
+participant "Système\nMiniBank" as SYS #DCE8F7
+
+Client -> SYS : demanderFormulaireVirement()
+SYS --> Client : comptes débitables et solde disponible
+
+Client -> SYS : saisirVirement(compteSource, compteCible, montant, motif)
+
+alt données invalides (montant ≤ 0, compte cible inconnu, même compte)
+  SYS --> Client : message d'erreur précis, rien n'est débité
+else plafond dépassé ou solde insuffisant
+  SYS --> Client : refus motivé (PLAFOND_DEPASSE / SOLDE_INSUFFISANT)
+else risque de fraude élevé
+  SYS --> Client : refus (RISQUE_FRAUDE), conseiller averti
+else cas nominal
+  SYS --> Client : confirmation (référence, nouveau solde)
+  SYS -->> Client : notification « virement exécuté »
+end
+
+legend right
+<b>Clé de lecture — séquence système</b>
+|= Symbole |= Signification |
+| Bonhomme / boîte en haut | Participants. Ici le système entier = <b>une seule boîte</b> |
+| Ligne pointillée verticale | <b>Ligne de vie</b> : le temps s'écoule de HAUT en BAS |
+| Flèche pleine | Message envoyé (une demande) |
+| Flèche pointillée | Réponse |
+| Flèche à pointe ouverte | Message asynchrone : on n'attend pas de réponse |
+| Cadre « alt » | Alternative : UNE SEULE branche s'exécute selon la [condition] |
+| Numéros | Ordre des messages, pour en parler en réunion (« au message 3… ») |
+<b>Méthode</b> : suivre les numéros. Dans un « alt », lire chaque branche
+comme un scénario séparé : nominal, puis chaque cas d'erreur.
+endlegend
+@enduml

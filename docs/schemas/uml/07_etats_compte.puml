@@ -1,0 +1,49 @@
+' ============================================================================
+' MiniBank — 07. Diagramme d'états-transitions : cycle de vie d'un COMPTE
+' ============================================================================
+@startuml 07_etats_compte
+!theme plain
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+skinparam shadowing false
+skinparam StateStartColor #000000
+skinparam ActivityStartColor #000000
+skinparam LegendBackgroundColor #F5F7FA
+skinparam LegendBorderColor #9AA5B1
+skinparam LegendFontSize 11
+skinparam state {
+  BorderColor #1F5FAD
+}
+
+title MiniBank — États d'un compte
+
+[*] --> ACTIF : ouvrir() / solde = 0
+
+state ACTIF #E3F1E3 : crédit autorisé\ndébit autorisé
+state BLOQUE #FFF3D6 : crédit autorisé\ndébit REFUSÉ
+state CLOTURE #EDEDED : aucune opération\ndonnées conservées\n(durée légale)
+
+ACTIF --> BLOQUE : bloquer()\n[rôle CONSEILLER]\n/ tracer dans l'audit
+BLOQUE --> ACTIF : debloquer()\n[rôle CONSEILLER]\n/ tracer dans l'audit
+ACTIF --> CLOTURE : cloturer()\n[solde = 0]
+CLOTURE --> [*]
+
+note right of BLOQUE
+  Exemple réel : suspicion de fraude,
+  carte volée, décès du titulaire.
+  L'argent peut arriver, il ne peut
+  plus partir.
+end note
+
+legend right
+<b>Clé de lecture</b>
+|= Symbole |= Signification |
+| Point noir / double cercle | Début / fin de vie |
+| Rectangle arrondi | État ; le texte dedans = ce qui est permis |
+| Flèche « méthode() [garde] / action » | Transition déclenchée par un appel |
+| Absence de flèche | <b>Transition interdite</b> (BLOQUE -> CLOTURE impossible) |
+<b>Méthode</b> : pour chaque état, se demander
+« quelles méthodes sont permises ici ? »
+Le code de Compte doit refuser tout le reste.
+endlegend
+@enduml

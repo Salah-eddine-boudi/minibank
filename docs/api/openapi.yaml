@@ -1,0 +1,348 @@
+# =============================================================================
+# MiniBank — Contrat d'API du service Comptes (OpenAPI 3.0)
+# Ouvrir avec : VS Code + extension « OpenAPI (Swagger) Editor », ou
+# https://editor.swagger.io (copier-coller). En phase 7, Spring génère ce
+# contrat automatiquement (springdoc-openapi) : on comparera les deux.
+# =============================================================================
+openapi: 3.0.3
+info:
+  title: MiniBank — API du service Comptes
+  version: 1.0.0
+  description: |
+    API REST de gestion des comptes et des virements internes de MiniBank
+    (banque fictive, projet d'apprentissage). Toutes les erreurs suivent le
+    format Problem Details (RFC 9457) enrichi d'un `code` métier stable.
+servers:
+  - url: http://localhost:8080
+    description: Poste de développement
+tags:
+  - name: Comptes
+  - name: Opérations
+  - name: Virements
+security:
+  - jwt: []
+
+paths:
+  /api/comptes:
+    post:
+      tags: [Comptes]
+      summary: Ouvrir un compte (EF-01)
+      description: Réservé au rôle CONSEILLER à partir de la phase 3.
+      operationId: ouvrirCompte
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreerCompteRequest' }
+            example: { titulaire: "Claire Martin", type: "COURANT" }
+      responses:
+        '201':
+          description: Compte créé
+          headers:
+            Location:
+              description: URL du compte créé
+              schema: { type: string, example: /api/comptes/MB0000000001 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompteResponse' }
+        '400': { $ref: '#/components/responses/Invalide' }
+        '403': { $ref: '#/components/responses/Interdit' }
+        '422': { $ref: '#/components/responses/RegleMetier' }
+
+  /api/comptes/{numero}:
+    get:
+      tags: [Comptes]
+      summary: Consulter un compte (EF-02)
+      operationId: consulterCompte
+      parameters:
+        - $ref: '#/components/parameters/Numero'
+      responses:
+        '200':
+          description: Le compte
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompteResponse' }
+        '404': { $ref: '#/components/responses/Introuvable' }
+
+  /api/comptes/{numero}/depots:
+    post:
+      tags: [Opérations]
+      summary: Enregistrer un dépôt au guichet (EF-04)
+      operationId: deposer
+      parameters:
+        - $ref: '#/components/parameters/Numero'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MontantRequest' }
+            example: { montant: 100.00 }
+      responses:
+        '200':
+          description: Dépôt enregistré, nouveau solde
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompteResponse' }
+        '400': { $ref: '#/components/responses/Invalide' }
+        '404': { $ref: '#/components/responses/Introuvable' }
+        '422': { $ref: '#/components/responses/RegleMetier' }
+
+  /api/comptes/{numero}/retraits:
+    post:
+      tags: [Opérations]
+      summary: Enregistrer un retrait au guichet (EF-05)
+      operationId: retirer
+      parameters:
+        - $ref: '#/components/parameters/Numero'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MontantRequest' }
+      responses:
+        '200':
+          description: Retrait enregistré, nouveau solde
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompteResponse' }
+        '400': { $ref: '#/components/responses/Invalide' }
+        '404': { $ref: '#/components/responses/Introuvable' }
+        '422': { $ref: '#/components/responses/RegleMetier' }
+
+  /api/comptes/{numero}/operations:
+    get:
+      tags: [Opérations]
+      summary: Historique paginé des opérations (EF-06)
+      operationId: historique
+      parameters:
+        - $ref: '#/components/parameters/Numero'
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: du, in: query, description: Date de début incluse, schema: { type: string, format: date } }
+        - { name: au, in: query, description: Date de fin incluse, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Une page d'opérations, de la plus récente à la plus ancienne
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOperations' }
+        '404': { $ref: '#/components/responses/Introuvable' }
+
+  /api/comptes/{numero}/blocage:
+    post:
+      tags: [Comptes]
+      summary: Bloquer un compte (EF-07)
+      operationId: bloquer
+      parameters:
+        - $ref: '#/components/parameters/Numero'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motif]
+              properties:
+                motif: { type: string, maxLength: 140, example: "Vol de carte déclaré" }
+      responses:
+        '200':
+          description: Compte bloqué
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompteResponse' }
+        '404': { $ref: '#/components/responses/Introuvable' }
+        '422': { $ref: '#/components/responses/RegleMetier' }
+    delete:
+      tags: [Comptes]
+      summary: Débloquer un compte (EF-07)
+      operationId: debloquer
+      parameters:
+        - $ref: '#/components/parameters/Numero'
+      responses:
+        '204': { description: Compte débloqué }
+        '404': { $ref: '#/components/responses/Introuvable' }
+
+  /api/comptes/{numero}/cloture:
+    post:
+      tags: [Comptes]
+      summary: Clôturer un compte au solde nul (EF-08)
+      operationId: cloturer
+      parameters:
+        - $ref: '#/components/parameters/Numero'
+      responses:
+        '200':
+          description: Compte clôturé
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompteResponse' }
+        '404': { $ref: '#/components/responses/Introuvable' }
+        '422': { $ref: '#/components/responses/RegleMetier' }
+
+  /api/virements:
+    post:
+      tags: [Virements]
+      summary: Effectuer un virement interne (EF-10, EF-11)
+      operationId: virer
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: UUID généré par le client pour chaque intention de virement (RG-10)
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VirementRequest' }
+            example: { compteSource: "MB0000000001", compteCible: "MB0000000003", montant: 650.00, motif: "Loyer octobre" }
+      responses:
+        '201':
+          description: Virement exécuté
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VirementResponse' }
+        '400': { $ref: '#/components/responses/Invalide' }
+        '404': { $ref: '#/components/responses/Introuvable' }
+        '409': { $ref: '#/components/responses/Conflit' }
+        '422': { $ref: '#/components/responses/RegleMetier' }
+
+components:
+  securitySchemes:
+    jwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Jeton d'accès délivré par Keycloak (à partir de la phase 3)
+
+  parameters:
+    Numero:
+      name: numero
+      in: path
+      required: true
+      description: Numéro de compte (RG-01)
+      schema: { type: string, pattern: '^MB[0-9]{10}$', example: MB0000000001 }
+
+  schemas:
+    TypeCompte:
+      type: string
+      enum: [COURANT, EPARGNE]
+    StatutCompte:
+      type: string
+      enum: [ACTIF, BLOQUE, CLOTURE]
+    TypeOperation:
+      type: string
+      enum: [DEPOT, RETRAIT, VIREMENT_EMIS, VIREMENT_RECU, INTERETS]
+    Montant:
+      type: number
+      description: Montant en euros, strictement positif, 2 décimales maximum (RG-02)
+      exclusiveMinimum: true
+      minimum: 0
+      multipleOf: 0.01
+      example: 250.00
+    CreerCompteRequest:
+      type: object
+      required: [titulaire, type]
+      properties:
+        titulaire: { type: string, minLength: 1, maxLength: 100 }
+        type: { $ref: '#/components/schemas/TypeCompte' }
+    MontantRequest:
+      type: object
+      required: [montant]
+      properties:
+        montant: { $ref: '#/components/schemas/Montant' }
+    VirementRequest:
+      type: object
+      required: [compteSource, compteCible, montant]
+      properties:
+        compteSource: { type: string, pattern: '^MB[0-9]{10}$' }
+        compteCible: { type: string, pattern: '^MB[0-9]{10}$' }
+        montant: { $ref: '#/components/schemas/Montant' }
+        motif: { type: string, maxLength: 140 }
+    CompteResponse:
+      type: object
+      properties:
+        numero: { type: string, example: MB0000000001 }
+        titulaire: { type: string, example: Claire Martin }
+        type: { $ref: '#/components/schemas/TypeCompte' }
+        solde: { type: number, example: 1200.00 }
+        statut: { $ref: '#/components/schemas/StatutCompte' }
+        dateCreation: { type: string, format: date-time }
+    OperationResponse:
+      type: object
+      properties:
+        type: { $ref: '#/components/schemas/TypeOperation' }
+        montant: { type: number, example: 650.00 }
+        soldeApres: { type: number, example: 550.00 }
+        date: { type: string, format: date-time }
+        reference: { type: string }
+        libelle: { type: string }
+    PageOperations:
+      type: object
+      properties:
+        contenu:
+          type: array
+          items: { $ref: '#/components/schemas/OperationResponse' }
+        page: { type: integer }
+        taille: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+    VirementResponse:
+      type: object
+      properties:
+        reference: { type: string, format: uuid }
+        compteSource: { type: string }
+        compteCible: { type: string }
+        montant: { type: number }
+        statut: { type: string, example: EXECUTE }
+        soldeSourceApres: { type: number, example: 550.00 }
+        dateExecution: { type: string, format: date-time }
+    ErreurChamp:
+      type: object
+      properties:
+        champ: { type: string, example: montant }
+        message: { type: string, example: doit être strictement positif }
+    Probleme:
+      type: object
+      description: Problem Details (RFC 9457) enrichi
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code:
+          type: string
+          enum: [VALIDATION, MONTANT_INVALIDE, COMPTE_INTROUVABLE, MEME_COMPTE, SOLDE_INSUFFISANT,
+                 PLAFOND_DEPASSE, COMPTE_INDISPONIBLE, CLOTURE_IMPOSSIBLE, LIMITE_COMPTES,
+                 RISQUE_FRAUDE, CONFLIT_VERSION, IDEMPOTENCE_CONFLIT, CONTROLE_INDISPONIBLE]
+        traceId: { type: string }
+        erreurs:
+          type: array
+          items: { $ref: '#/components/schemas/ErreurChamp' }
+
+  responses:
+    Invalide:
+      description: Requête invalide (400)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Probleme' }
+    Interdit:
+      description: Action non autorisée pour ce rôle (403)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Probleme' }
+    Introuvable:
+      description: Compte inexistant ou non accessible (404)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Probleme' }
+    Conflit:
+      description: Conflit de version ou clé d'idempotence réutilisée (409)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Probleme' }
+    RegleMetier:
+      description: Requête refusée par une règle métier (422)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Probleme' }

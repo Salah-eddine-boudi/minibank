@@ -1,0 +1,33 @@
+' ============================================================================
+' MiniBank — 13. Modèle C4, niveau 1 : diagramme de CONTEXTE
+' Le zoom le plus large : le système dans son environnement (qui l'utilise,
+' avec quels systèmes il échange). Lisible par un non-technicien.
+' ============================================================================
+@startuml 13_c4_contexte
+!include <C4/C4_Context>
+skinparam defaultFontName "DejaVu Sans"
+skinparam dpi 130
+LAYOUT_TOP_DOWN()
+
+title MiniBank — C4 niveau 1 : contexte du système
+
+Person(client, "Client", "Particulier qui consulte ses comptes et fait des virements")
+Person(conseiller, "Conseiller", "Employé d'agence : ouvre, bloque, clôture des comptes")
+Person(admin, "Administrateur", "Gère les accès, consulte l'audit")
+
+System(minibank, "MiniBank", "Banque en ligne : comptes, virements internes, historique, notifications")
+
+System_Ext(idp, "Keycloak", "Fournisseur d'identité : connexion, rôles, jetons JWT (OIDC)")
+System_Ext(mail, "Serveur e-mail", "Envoi des notifications (simulé en local par Mailpit)")
+
+Rel(client, minibank, "Consulte ses comptes, effectue des virements", "HTTPS")
+Rel(conseiller, minibank, "Gère les comptes clients", "HTTPS")
+Rel(admin, minibank, "Administre et audite", "HTTPS")
+Rel(minibank, idp, "Délègue l'authentification, vérifie les jetons", "OIDC / HTTPS")
+Rel(client, idp, "Saisit ses identifiants", "HTTPS")
+Rel(minibank, mail, "Envoie les notifications", "SMTP")
+
+SHOW_LEGEND()
+
+footer Méthode C4 : 1) personnes  2) LE système (bleu foncé)  3) systèmes externes (gris)  4) lire chaque flèche « qui -> fait quoi -> avec quel protocole »
+@enduml
