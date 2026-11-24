@@ -1,0 +1,23 @@
+# infra/docker-compose.yml : l'infrastructure locale de MiniBank (aujourd'hui PostgreSQL ; demain Kafka, Keycloak…)
+# Lancement : dans le dossier infra, `docker compose up -d`. Les secrets sont lus dans infra/.env (copie de .env.example).
+name: minibank                 # nom de projet fixe : garde le même conteneur et le même volume, quel que soit le dossier
+
+services:                      # la liste des conteneurs à lancer
+  postgres:                    # nom du service (sert dans les logs et le réseau Docker)
+    image: postgres:17         # image officielle PostgreSQL, version majeure 17 (jamais "latest")
+    environment:               # variables lues par l'image au tout premier démarrage
+      POSTGRES_DB: ${POSTGRES_DB:-comptes}          # base "comptes" (valeur par défaut après ":-")
+      POSTGRES_USER: ${POSTGRES_USER:-minibank}     # utilisateur applicatif
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copie .env.example en .env et renseigne POSTGRES_PASSWORD}  # obligatoire, lu dans .env
+    ports:
+      - "5433:5432"            # port de ta machine : port du conteneur (5432 est déjà pris sur le poste)
+    volumes:
+      - comptes-data:/var/lib/postgresql/data  # données rangées hors du conteneur pour ne pas les perdre
+    healthcheck:               # Docker vérifie que la base accepte les connexions
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-minibank} -d ${POSTGRES_DB:-comptes}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  comptes-data:                # volume nommé, géré par Docker

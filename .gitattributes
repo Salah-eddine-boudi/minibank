@@ -1,0 +1,17 @@
+# Git normalise les fins de ligne : LF dans le dépôt, quel que soit le poste (Windows ou CI Linux).
+* text=auto eol=lf
+
+# Scripts Windows : CRLF obligatoire, sinon cmd.exe et PowerShell peuvent mal les lire.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Scripts Unix (Maven Wrapper, shell) : LF obligatoire, sinon la CI Linux échoue.
+mvnw  text eol=lf
+*.sh  text eol=lf
+
+# Fichiers binaires : jamais transformés.
+*.jar binary
+*.png binary
+*.jpg binary
+*.pdf binary

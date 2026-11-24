@@ -1,0 +1,36 @@
+# Java / Maven
+target/
+*.class
+*.log
+hs_err_pid*
+.mvn/wrapper/maven-wrapper.jar
+
+# Node / React / Angular / NestJS
+node_modules/
+dist/
+.angular/
+
+# Python (service Fraude, ETL)
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# IDE et système
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.DS_Store
+Thumbs.db
+
+# Secrets : jamais dans Git
+.env
+*.pem
+*.key
+
+# Fichiers personnels des agents (Claude Code, Codex) et sauvegardes
+CLAUDE.local.md
+.claude/settings.local.json
+*.bak
